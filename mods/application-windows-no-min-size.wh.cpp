@@ -2,7 +2,7 @@
 // @id              application-windows-no-min-size
 // @name            Application Windows: No Minimum Size
 // @description     Removes minimum sizes and waits for manual closure before unloading
-// @version         1.7.6
+// @version         1.7.5
 // @author          SaiLuminous
 // @github          https://github.com/SaiLuminous
 // @include         *
@@ -125,26 +125,6 @@ Distributed under the MIT License; the notice is included below.
 #include <unordered_map>
 #include <vector>
 
-// Diagnostic phase log; no titles, document names, or window contents.
-static void TraceUnload(const wchar_t* phase, HWND hwnd = nullptr,
-                        LONG width = 0, LONG height = 0,
-                        LONG minWidth = 0, LONG minHeight = 0) {
-    wchar_t temp[MAX_PATH]{}, path[MAX_PATH]{}, line[512]{};
-    DWORD n = GetTempPathW(ARRAYSIZE(temp), temp);
-    if (!n || n >= ARRAYSIZE(temp)) return;
-    swprintf_s(path, L"%sWindhawk-NoMinSize-%lu.log", temp, GetCurrentProcessId());
-    HANDLE file = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (file == INVALID_HANDLE_VALUE) return;
-    int count = swprintf_s(line,
-        L"%llu phase=%s hwnd=%p size=%ldx%ld min=%ldx%ld\r\n",
-        GetTickCount64(), phase, hwnd, width, height, minWidth, minHeight);
-    if (count > 0) {
-        DWORD written;
-        WriteFile(file, line, count * sizeof(wchar_t), &written, nullptr);
-    }
-    CloseHandle(file);
-}
 static bool g_isExplorer = false;
 static std::atomic<bool> g_stopping{false};
 static std::atomic<unsigned> g_attaching{0};
@@ -368,7 +348,7 @@ return Wh_SetFunctionHook(reinterpret_cast<void*>(CreateWindowExW),
 void Wh_ModAfterInit() {
     EnumWindows(EnumAttach, 0);
 }
-static bool IsStillUndersized(HWND hwnd, const WindowState& state, bool trace) {
+static bool IsStillUndersized(HWND hwnd, const WindowState& state) {
     if (!IsWindow(hwnd) || (!IsWindowVisible(hwnd) && !IsIconic(hwnd))) return false;
     RECT rect{};
     if (IsIconic(hwnd) || IsZoomed(hwnd)) {
@@ -380,18 +360,13 @@ static bool IsStillUndersized(HWND hwnd, const WindowState& state, bool trace) {
     }
     LONG minWidth = (std::max)(state.nativeMinWidth, LONG(state.filePilotMinWidth));
     LONG minHeight = (std::max)(state.nativeMinHeight, LONG(state.filePilotMinHeight));
-    if (trace) TraceUnload(L"size-check", hwnd, rect.right - rect.left,
-                          rect.bottom - rect.top, minWidth, minHeight);
     return (minWidth > 0 && rect.right - rect.left < minWidth) ||
            (minHeight > 0 && rect.bottom - rect.top < minHeight);
 }
 
 void Wh_ModBeforeUninit() {
     g_stopping.store(true);
-    TraceUnload(L"waiting-for-attachments");
     while (g_attaching.load()) Sleep(1);
-    TraceUnload(L"attachments-finished");
-    ULONGLONG lastTrace = 0;
     for (;;) {
         std::vector<std::pair<HWND, WindowState>> snapshot;
         {
@@ -399,10 +374,8 @@ void Wh_ModBeforeUninit() {
             for (const auto& item : g_windows) snapshot.push_back(item);
         }
         bool waiting = false;
-        bool trace = GetTickCount64() - lastTrace >= 5000;
-        if (trace) lastTrace = GetTickCount64();
         for (const auto& [hwnd, state] : snapshot) {
-            if (IsStillUndersized(hwnd, state, trace)) {
+            if (IsStillUndersized(hwnd, state)) {
                 waiting = true;
                 break;
             }
@@ -415,16 +388,11 @@ void Wh_ModBeforeUninit() {
         std::lock_guard lock(g_windowsMutex);
         for (const auto& [hwnd, state] : g_windows) windows.push_back(hwnd);
     }
-    TraceUnload(L"size-wait-finished");
     for (HWND hwnd : windows) {
-        TraceUnload(L"detach-start", hwnd);
         WindhawkUtils::RemoveWindowSubclassFromAnyThread(hwnd, SubclassWndProc);
-        TraceUnload(L"detach-finished", hwnd);
     }
-    TraceUnload(L"before-uninit-finished");
 }
 void Wh_ModUninit() {
-    TraceUnload(L"uninit-reached");
     std::lock_guard lock(g_windowsMutex);
     g_windows.clear();
 }

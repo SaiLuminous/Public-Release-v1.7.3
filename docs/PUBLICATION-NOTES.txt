@@ -1,4 +1,4 @@
-Publication notes — v1.7.6
+Publication notes — v1.7.5
 Author: SaiLuminous
 GitHub: https://github.com/SaiLuminous
 Original mod author: Anixx
@@ -24,5 +24,3 @@ Both x86 and x86-64 source syntax checks pass. Runtime validation remains pendin
 
 Submission requirements:
 https://github.com/ramensoftware/windhawk-mods#submitting-a-new-mod
-
-Diagnostic build: unload phases and window dimensions are logged as UTF-16 to %TEMP%\Windhawk-NoMinSize-<PID>.log. Window titles and contents are not recorded. This version diagnoses the remaining wait; it is not a verified fix.

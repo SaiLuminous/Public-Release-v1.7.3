@@ -7,7 +7,7 @@ Based on [Explorer No Minimum Window Size](https://windhawk.net/mods/explorer-no
 by [Anixx](https://github.com/Anixx). This adaptation extends the original
 Explorer-only approach to eligible top-level application windows.
 
-**Version:** 1.7.6 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
+**Version:** 1.7.5 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
 **Status:** Experimental
 
 ## Installation
@@ -101,5 +101,3 @@ For an unload wait, mention which affected windows are still open or minimized.
 To submit to the official collection, follow
 [Windhawk's submission instructions](https://github.com/ramensoftware/windhawk-mods#submitting-a-new-mod).
 That pull request should contain only the mod source file under mods/.
-
-Diagnostic build: unload phases and window dimensions are logged as UTF-16 to %TEMP%\Windhawk-NoMinSize-<PID>.log. Window titles and contents are not recorded. This version diagnoses the remaining wait; it is not a verified fix.
