@@ -1,0 +1,26 @@
+Publication notes — v1.7.3
+Author: SaiLuminous
+GitHub: https://github.com/SaiLuminous
+Original mod author: Anixx
+
+Based on v1.7.2; author metadata and adaptation credit updated only.
+Previous versions and the installed mod are unchanged.
+
+Submit this single file as:
+mods/application-windows-no-min-size.wh.cpp
+
+Before a stable release, live-test enable/disable, Explorer with no folder
+windows, minimized windows, manual-close waiting, and File Pilot with the
+override off and on. Syntax checks are not runtime validation.
+
+Suggested PR title:
+Add Application Windows: No Minimum Size
+
+Suggested description:
+Extends Anixx's Explorer No Minimum Window Size approach to eligible application
+windows. Includes an opt-in, build-checked File Pilot 0.8.5 override and waits
+for affected windows to be manually closed before unloading.
+Both x86 and x86-64 source syntax checks pass. Runtime validation remains pending.
+
+Submission requirements:
+https://github.com/ramensoftware/windhawk-mods#submitting-a-new-mod

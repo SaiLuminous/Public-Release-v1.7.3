@@ -1,0 +1,21 @@
+# Generated build files
+/build/
+*.dll
+*.obj
+*.o
+*.pdb
+*.ilk
+*.log
+
+# Local editor and OS files
+.vs/
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Local backup files
+*.bak
+*.backup
+*~
