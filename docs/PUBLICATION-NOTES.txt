@@ -1,26 +1,27 @@
-Publication notes — v1.7.5
+Publication notes — v1.8.0
 Author: SaiLuminous
-GitHub: https://github.com/SaiLuminous
 Original mod author: Anixx
 
-Based on v1.7.4; removes posted unload-assessment messages and checks current sizes against cached native and File Pilot minimums.
-Previous versions and the installed mod are unchanged.
+Review adjustments:
+1. Removed the unload size-wait loop, minimum-size bookkeeping, and polling.
+   Subclasses are detached after in-flight attachments finish.
+2. Removed ShowWindowAsync hooking entirely so it cannot introduce a blocking attach.
+3. Retained the optional File Pilot override at the author's request. Documented the exact supported build, planned maintenance alongside releases, and why an app-specific hook is necessary. The reviewer's portability concern remains: this is still build-pinned, not a cross-version pattern scan.
+4. Separate submission rationale: this mod deliberately targets eligible windows
+   across applications, while the original is scoped to Explorer. Keeping them
+   separate lets Explorer-only users retain that narrower scope. Shared mechanism
+   and original authorship are explicitly credited. This rationale is subject to
+   the maintainer's judgment; it does not claim the underlying technique is new.
 
-Submit this single file as:
-mods/application-windows-no-min-size.wh.cpp
+Also replaced raw hook casts with typed hooks, simplified tracking to a set,
+removed dead fields, and cleaned up documentation and indentation.
+Version remains monotonic at 1.8.0 so existing local installations can update.
 
-Before a stable release, live-test enable/disable, Explorer with no folder
-windows, minimized windows, manual-close waiting, and File Pilot with the
-override off and on. Syntax checks are not runtime validation.
+Validation:
+- x86 and x86-64 compiler checks: run after changes.
+- Actual enable/disable/update testing with apps remains pending.
+- Removing size polling does not guarantee that an unresponsive window thread
+  cannot delay synchronous subclass detachment.
 
-Suggested PR title:
-Add Application Windows: No Minimum Size
-
-Suggested description:
-Extends Anixx's Explorer No Minimum Window Size approach to eligible application
-windows. Includes an opt-in, build-checked File Pilot 0.8.5 override and waits
-for affected windows to be closed or enlarged before unloading.
-Both x86 and x86-64 source syntax checks pass. Runtime validation remains pending.
-
-Submission requirements:
-https://github.com/ramensoftware/windhawk-mods#submitting-a-new-mod
+Submit only mods/application-windows-no-min-size.wh.cpp to the official collection.
+Do not describe the earlier runtime hangs as proven fixed before live validation.

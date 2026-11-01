@@ -7,18 +7,14 @@ Based on [Explorer No Minimum Window Size](https://windhawk.net/mods/explorer-no
 by [Anixx](https://github.com/Anixx). This adaptation extends the original
 Explorer-only approach to eligible top-level application windows.
 
-**Version:** 1.7.5 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
-**Status:** Experimental
+**Version:** 1.8.0 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
 
 ## Installation
 
 1. Install [Windhawk](https://windhawk.net/).
-2. Open [the mod source](mods/application-windows-no-min-size.wh.cpp) and copy its complete contents.
-3. In Windhawk, choose **Create a New Mod**, replace the editor contents with the source, and click **Compile Mod**.
-4. Enable the mod. The optional File Pilot override is in its **Settings** tab.
-
-This repository provides source for local installation. It has not yet been
-published in the official Windhawk catalog.
+2. Copy the complete [mod source](mods/application-windows-no-min-size.wh.cpp).
+3. Select **Create a New Mod** in Windhawk, paste the source, and compile.
+4. Enable the mod and resize a supported window.
 
 ## Usage
 
@@ -31,32 +27,24 @@ process inclusion/exclusion controls to restrict it to particular applications.
 Explorer's desktop, taskbar, and helper windows are excluded; only its folder
 window classes are eligible.
 
-## File Pilot override
+## File Pilot support
 
-**File Pilot minimum-size override (experimental)** is disabled by default.
-Enable it in the Settings tab if File Pilot snaps back to its minimum size.
+The optional **File Pilot minimum-size override** currently supports the
+verified 64-bit File Pilot 0.8.5 build. It is disabled by default.
+Support is planned to be updated alongside File Pilot releases as new builds
+are checked. Updates are not automatically compatible: an unrecognized build
+is left unchanged until its override has been updated and verified.
 
-This optional override targets a separately verified correction call in one
-64-bit File Pilot 0.8.5 build. It checks the executable build and instruction
-signature before installing the hook. Other builds are left unchanged.
-It does not modify the File Pilot executable on disk. Toggle changes apply
-immediately while the mod is running; disabling the option restores File
-Pilot's normal size correction.
+File Pilot needs specific support because it enforces its minimum size through
+an internal correction that calls SetWindowPos, separately from the standard
+Windows minimum-size message. The generic override cannot prevent that
+correction. The optional hook suppresses only the identified correction call,
+after checking the executable build and code signature; it does not patch
+the executable on disk.
 
-## Disabling or updating
-
-The mod waits for affected windows to be closed or enlarged to their normal minimum before unloading.
-Windhawk may display **Uninitializing...** during this intentional wait.
-
-- Close or enlarge windows that are below their reported minimum. Their size is rechecked while waiting.
-- File Pilot uses observed size-correction dimensions; an old override event alone does not block unloading.
-- Complete any save prompts. Minimizing a window is not closing it.
-- Hidden windows are excluded from the initial manual-close assessment.
-- Unresponsive window threads can delay unloading until they respond or exit.
-
-Minimum-size overrides remain active while waiting. The mod does not close
-applications, terminate processes, resize windows automatically, or draw borders.
-
+Enable this option in the mod's Settings tab. Other mods hooking the same
+function may interfere with it. Very small windows may expose application
+layout or rendering bugs.
 ## Compatibility and limitations
 
 The standard override changes Windows' minimum tracking size. Applications
@@ -67,12 +55,13 @@ This mod does not make fixed-size dialogs resizable or make a window manager
 manage excluded windows. Protected processes and applications excluded by
 Windhawk are unaffected. Window-manager borders and padding are unchanged.
 
-The File Pilot option is experimental. Source compilation has been checked
-for x86 and x86-64; this is not comprehensive application compatibility testing.
-Unload checks use minimum sizes observed during normal window messages and File Pilot corrections; they no longer wait for an assessment reply. Unknown minimums cannot be detected. Subclass removal still requires a responsive window thread.
+Disabling restores normal minimum-size handling without requiring you to resize
+or close windows first. It does not actively resize or close windows.
+Applications can apply their minimum on a subsequent resize.
 
-The manual-unload behavior needs further live testing before a stable release.
-
+Other applications may enforce independent minimum sizes that the standard override does not bypass. Very small windows can cause clipping or
+application-specific rendering problems. Exclude incompatible applications
+using Windhawk's per-mod advanced settings.
 ## Credits and license
 
 Original mod: **Explorer No Minimum Window Size** by **Anixx**.
@@ -83,21 +72,6 @@ https://github.com/ramensoftware/windhawk-mods/blob/main/mods/explorer-no-min-si
 
 Distributed under the [MIT License](LICENSE).
 
-## Repository layout
+## Development
 
-- [Mod source](mods/application-windows-no-min-size.wh.cpp) — self-contained Windhawk mod, settings, and embedded documentation.
-- [LICENSE](LICENSE) — MIT license and author notices.
-- [Publication notes](docs/PUBLICATION-NOTES.txt) — submission notes and remaining runtime validation.
-
-## Development and reporting issues
-
-Edit and compile the source through Windhawk's mod editor. Keep the embedded
-README and this README consistent when changing user-facing behavior.
-
-When reporting an issue, include your Windows version, Windhawk version, app
-name/version, whether the File Pilot option is enabled, and steps to reproduce.
-For an unload wait, mention which affected windows are still open or minimized.
-
-To submit to the official collection, follow
-[Windhawk's submission instructions](https://github.com/ramensoftware/windhawk-mods#submitting-a-new-mod).
-That pull request should contain only the mod source file under mods/.
+The self-contained source is in mods/. Compile it through Windhawk. See [publication notes](docs/PUBLICATION-NOTES.txt) for validation status and submission context.
