@@ -2,7 +2,7 @@
 // @id              application-windows-no-min-size
 // @name            Application Windows: No Minimum Size
 // @description     Removes minimum sizes and waits for manual closure before unloading
-// @version         1.7.4
+// @version         1.7.6
 // @author          SaiLuminous
 // @github          https://github.com/SaiLuminous
 // @include         *
@@ -69,6 +69,10 @@ Windhawk are unaffected. Window-manager borders and padding are unchanged.
 
 The File Pilot option is experimental. Source compilation has been checked
 for x86 and x86-64; this is not comprehensive application compatibility testing.
+Unload checks use minimum dimensions observed during normal window messages
+and suppressed File Pilot corrections, without waiting for an assessment reply.
+If an application never exposes a minimum, the mod cannot identify that limit.
+Subclass removal still requires a responsive window thread.
 The manual-unload behavior needs further live testing before a stable release.
 
 ## Credits and license
@@ -121,56 +125,39 @@ Distributed under the MIT License; the notice is included below.
 #include <unordered_map>
 #include <vector>
 
+// Diagnostic phase log; no titles, document names, or window contents.
+static void TraceUnload(const wchar_t* phase, HWND hwnd = nullptr,
+                        LONG width = 0, LONG height = 0,
+                        LONG minWidth = 0, LONG minHeight = 0) {
+    wchar_t temp[MAX_PATH]{}, path[MAX_PATH]{}, line[512]{};
+    DWORD n = GetTempPathW(ARRAYSIZE(temp), temp);
+    if (!n || n >= ARRAYSIZE(temp)) return;
+    swprintf_s(path, L"%sWindhawk-NoMinSize-%lu.log", temp, GetCurrentProcessId());
+    HANDLE file = CreateFileW(path, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                              nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file == INVALID_HANDLE_VALUE) return;
+    int count = swprintf_s(line,
+        L"%llu phase=%s hwnd=%p size=%ldx%ld min=%ldx%ld\r\n",
+        GetTickCount64(), phase, hwnd, width, height, minWidth, minHeight);
+    if (count > 0) {
+        DWORD written;
+        WriteFile(file, line, count * sizeof(wchar_t), &written, nullptr);
+    }
+    CloseHandle(file);
+}
 static bool g_isExplorer = false;
 static std::atomic<bool> g_stopping{false};
 static std::atomic<unsigned> g_attaching{0};
 static std::mutex g_windowsMutex;
 struct WindowState {
-    bool waitingForClosure = false;
-    bool checkQueued = false;
+
+    LONG nativeMinWidth = 0;
+    LONG nativeMinHeight = 0;
     bool filePilotCorrectionBlocked = false;
     int filePilotMinWidth = 0;
     int filePilotMinHeight = 0;
 };
 static std::unordered_map<HWND, WindowState> g_windows;
-static UINT g_checkMessage = 0;
-
-// Runs on the owning thread; overrides remain active during the unload wait.
-static void AssessWindowForUnload(HWND hwnd) {
-    {
-        std::lock_guard lock(g_windowsMutex);
-        auto it = g_windows.find(hwnd);
-        if (it == g_windows.end()) return;
-        it->second.checkQueued = false;
-    }
-    if (!IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
-        std::lock_guard lock(g_windowsMutex);
-        auto it = g_windows.find(hwnd);
-        if (it != g_windows.end()) it->second.waitingForClosure = false;
-        return;
-    }
-    MINMAXINFO limits{};
-    DefSubclassProc(hwnd, WM_GETMINMAXINFO, 0, reinterpret_cast<LPARAM>(&limits));
-    RECT rect{};
-    bool measured = GetWindowRect(hwnd, &rect) != FALSE;
-    if (IsIconic(hwnd) || IsZoomed(hwnd)) {
-        WINDOWPLACEMENT placement{sizeof(placement)};
-        measured = GetWindowPlacement(hwnd, &placement) != FALSE;
-        if (measured) rect = placement.rcNormalPosition;
-    }
-    std::lock_guard lock(g_windowsMutex);
-    auto it = g_windows.find(hwnd);
-    if (it == g_windows.end()) return;
-    const auto& state = it->second;
-    limits.ptMinTrackSize.x = (std::max)(
-        limits.ptMinTrackSize.x, LONG(state.filePilotMinWidth));
-    limits.ptMinTrackSize.y = (std::max)(
-        limits.ptMinTrackSize.y, LONG(state.filePilotMinHeight));
-    bool undersized = !measured ||
-        (limits.ptMinTrackSize.x > 0 && rect.right - rect.left < limits.ptMinTrackSize.x) ||
-        (limits.ptMinTrackSize.y > 0 && rect.bottom - rect.top < limits.ptMinTrackSize.y);
-    it->second.waitingForClosure = undersized;
-}
 static bool IsApplicationWindow(HWND hwnd) {
     if (!hwnd || !IsWindow(hwnd)) return false;
     DWORD pid = 0;
@@ -201,11 +188,7 @@ static bool IsApplicationWindow(HWND hwnd) {
 
 static LRESULT CALLBACK SubclassWndProc(HWND hwnd, UINT msg, WPARAM wp,
                                         LPARAM lp, DWORD_PTR) {
-    if (g_checkMessage && msg == g_checkMessage && g_stopping.load()) {
-        AssessWindowForUnload(hwnd);
-        return 0;
-    }
-    if (msg == WM_NCDESTROY) {
+if (msg == WM_NCDESTROY) {
         {
             std::lock_guard lock(g_windowsMutex);
             g_windows.erase(hwnd);
@@ -217,6 +200,14 @@ static LRESULT CALLBACK SubclassWndProc(HWND hwnd, UINT msg, WPARAM wp,
     if (msg == WM_GETMINMAXINFO && lp &&
         IsApplicationWindow(hwnd)) {
         auto* limits = reinterpret_cast<MINMAXINFO*>(lp);
+        {
+            std::lock_guard lock(g_windowsMutex);
+            auto it = g_windows.find(hwnd);
+            if (it != g_windows.end()) {
+                it->second.nativeMinWidth = limits->ptMinTrackSize.x;
+                it->second.nativeMinHeight = limits->ptMinTrackSize.y;
+            }
+        }
         limits->ptMinTrackSize.x = 1;
         limits->ptMinTrackSize.y = 1;
     }
@@ -365,9 +356,7 @@ BOOL Wh_ModInit() {
     g_stopping.store(false);
     Wh_ModSettingsChanged();
     if (!InstallFilePilotHook()) return FALSE;
-    g_checkMessage = RegisterWindowMessageW(L"Windhawk_NoMinSize_Wait_v17");
-    if (!g_checkMessage) return FALSE;
-    return Wh_SetFunctionHook(reinterpret_cast<void*>(CreateWindowExW),
+return Wh_SetFunctionHook(reinterpret_cast<void*>(CreateWindowExW),
                reinterpret_cast<void*>(CreateWHook), reinterpret_cast<void**>(&OriginalCreateW)) &&
            Wh_SetFunctionHook(reinterpret_cast<void*>(CreateWindowExA),
                reinterpret_cast<void*>(CreateAHook), reinterpret_cast<void**>(&OriginalCreateA)) &&
@@ -379,53 +368,63 @@ BOOL Wh_ModInit() {
 void Wh_ModAfterInit() {
     EnumWindows(EnumAttach, 0);
 }
+static bool IsStillUndersized(HWND hwnd, const WindowState& state, bool trace) {
+    if (!IsWindow(hwnd) || (!IsWindowVisible(hwnd) && !IsIconic(hwnd))) return false;
+    RECT rect{};
+    if (IsIconic(hwnd) || IsZoomed(hwnd)) {
+        WINDOWPLACEMENT placement{sizeof(placement)};
+        if (!GetWindowPlacement(hwnd, &placement)) return false;
+        rect = placement.rcNormalPosition;
+    } else if (!GetWindowRect(hwnd, &rect)) {
+        return false;
+    }
+    LONG minWidth = (std::max)(state.nativeMinWidth, LONG(state.filePilotMinWidth));
+    LONG minHeight = (std::max)(state.nativeMinHeight, LONG(state.filePilotMinHeight));
+    if (trace) TraceUnload(L"size-check", hwnd, rect.right - rect.left,
+                          rect.bottom - rect.top, minWidth, minHeight);
+    return (minWidth > 0 && rect.right - rect.left < minWidth) ||
+           (minHeight > 0 && rect.bottom - rect.top < minHeight);
+}
+
 void Wh_ModBeforeUninit() {
     g_stopping.store(true);
+    TraceUnload(L"waiting-for-attachments");
     while (g_attaching.load()) Sleep(1);
-    std::vector<HWND> windows;
-    {
-        std::lock_guard lock(g_windowsMutex);
-        for (auto& [hwnd, state] : g_windows) {
-            // Hidden background windows must not enter the manual-closure wait.
-            state.waitingForClosure = IsWindowVisible(hwnd) || IsIconic(hwnd);
-            state.checkQueued = state.waitingForClosure;
-            windows.push_back(hwnd);
-        }
-    }
-    for (HWND hwnd : windows) {
-        // No synchronous cross-thread query: window threads remain free to
-        // handle user input, save prompts, and destruction.
-        if (IsWindowVisible(hwnd) || IsIconic(hwnd))
-            PostMessageW(hwnd, g_checkMessage, 0, 0);
-    }
+    TraceUnload(L"attachments-finished");
+    ULONGLONG lastTrace = 0;
     for (;;) {
-        bool waiting = false;
-        std::vector<HWND> checks;
+        std::vector<std::pair<HWND, WindowState>> snapshot;
         {
             std::lock_guard lock(g_windowsMutex);
-            for (auto& [hwnd, state] : g_windows) {
-                if (!state.waitingForClosure) continue;
+            for (const auto& item : g_windows) snapshot.push_back(item);
+        }
+        bool waiting = false;
+        bool trace = GetTickCount64() - lastTrace >= 5000;
+        if (trace) lastTrace = GetTickCount64();
+        for (const auto& [hwnd, state] : snapshot) {
+            if (IsStillUndersized(hwnd, state, trace)) {
                 waiting = true;
-                if (!state.checkQueued) {
-                    state.checkQueued = true;
-                    checks.push_back(hwnd);
-                }
+                break;
             }
         }
         if (!waiting) break;
-        for (HWND hwnd : checks) PostMessageW(hwnd, g_checkMessage, 0, 0);
-        Sleep(250); // Reassess after manual enlargement; at most one queued check/window.
+        Sleep(250);
     }
-    windows.clear();
+    std::vector<HWND> windows;
     {
         std::lock_guard lock(g_windowsMutex);
         for (const auto& [hwnd, state] : g_windows) windows.push_back(hwnd);
     }
+    TraceUnload(L"size-wait-finished");
     for (HWND hwnd : windows) {
+        TraceUnload(L"detach-start", hwnd);
         WindhawkUtils::RemoveWindowSubclassFromAnyThread(hwnd, SubclassWndProc);
+        TraceUnload(L"detach-finished", hwnd);
     }
+    TraceUnload(L"before-uninit-finished");
 }
 void Wh_ModUninit() {
+    TraceUnload(L"uninit-reached");
     std::lock_guard lock(g_windowsMutex);
     g_windows.clear();
 }
