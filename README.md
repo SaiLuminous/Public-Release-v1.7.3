@@ -7,7 +7,7 @@ Based on [Explorer No Minimum Window Size](https://windhawk.net/mods/explorer-no
 by [Anixx](https://github.com/Anixx). This adaptation extends the original
 Explorer-only approach to eligible top-level application windows.
 
-**Version:** 1.7.3 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
+**Version:** 1.7.4 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
 **Status:** Experimental
 
 ## Installation
@@ -19,6 +19,7 @@ Explorer-only approach to eligible top-level application windows.
 
 This repository provides source for local installation. It has not yet been
 published in the official Windhawk catalog.
+
 ## Usage
 
 Enable the mod, then resize a supported window normally or with your window
@@ -44,12 +45,11 @@ Pilot's normal size correction.
 
 ## Disabling or updating
 
-The mod waits for you to manually close affected windows before unloading.
+The mod waits for affected windows to be closed or enlarged to their normal minimum before unloading.
 Windhawk may display **Uninitializing...** during this intentional wait.
 
-- Close windows that were below their reported minimum when unloading began.
-- Close File Pilot windows that used the optional override, even if they have
-  since been enlarged.
+- Close or enlarge windows that are below their reported minimum. Their size is rechecked while waiting.
+- File Pilot uses observed size-correction dimensions; an old override event alone does not block unloading.
 - Complete any save prompts. Minimizing a window is not closing it.
 - Hidden windows are excluded from the initial manual-close assessment.
 - Unresponsive window threads can delay unloading until they respond or exit.

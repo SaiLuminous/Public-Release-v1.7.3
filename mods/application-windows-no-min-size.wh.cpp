@@ -2,7 +2,7 @@
 // @id              application-windows-no-min-size
 // @name            Application Windows: No Minimum Size
 // @description     Removes minimum sizes and waits for manual closure before unloading
-// @version         1.7.3
+// @version         1.7.4
 // @author          SaiLuminous
 // @github          https://github.com/SaiLuminous
 // @include         *
@@ -45,12 +45,11 @@ Pilot's normal size correction.
 
 ## Disabling or updating
 
-The mod waits for you to manually close affected windows before unloading.
+The mod waits for affected windows to be closed or enlarged to their normal minimum before unloading.
 Windhawk may display **Uninitializing...** during this intentional wait.
 
-- Close windows that were below their reported minimum when unloading began.
-- Close File Pilot windows that used the optional override, even if they have
-  since been enlarged.
+- Close or enlarge windows that are below their reported minimum.
+- File Pilot uses observed size-correction dimensions; an old override event alone does not block unloading.
 - Complete any save prompts. Minimizing a window is not closing it.
 - Hidden windows are excluded from the initial manual-close assessment.
 - Unresponsive window threads can delay unloading until they respond or exit.
@@ -128,6 +127,7 @@ static std::atomic<unsigned> g_attaching{0};
 static std::mutex g_windowsMutex;
 struct WindowState {
     bool waitingForClosure = false;
+    bool checkQueued = false;
     bool filePilotCorrectionBlocked = false;
     int filePilotMinWidth = 0;
     int filePilotMinHeight = 0;
@@ -137,6 +137,12 @@ static UINT g_checkMessage = 0;
 
 // Runs on the owning thread; overrides remain active during the unload wait.
 static void AssessWindowForUnload(HWND hwnd) {
+    {
+        std::lock_guard lock(g_windowsMutex);
+        auto it = g_windows.find(hwnd);
+        if (it == g_windows.end()) return;
+        it->second.checkQueued = false;
+    }
     if (!IsWindowVisible(hwnd) && !IsIconic(hwnd)) {
         std::lock_guard lock(g_windowsMutex);
         auto it = g_windows.find(hwnd);
@@ -156,10 +162,14 @@ static void AssessWindowForUnload(HWND hwnd) {
     auto it = g_windows.find(hwnd);
     if (it == g_windows.end()) return;
     const auto& state = it->second;
+    limits.ptMinTrackSize.x = (std::max)(
+        limits.ptMinTrackSize.x, LONG(state.filePilotMinWidth));
+    limits.ptMinTrackSize.y = (std::max)(
+        limits.ptMinTrackSize.y, LONG(state.filePilotMinHeight));
     bool undersized = !measured ||
         (limits.ptMinTrackSize.x > 0 && rect.right - rect.left < limits.ptMinTrackSize.x) ||
         (limits.ptMinTrackSize.y > 0 && rect.bottom - rect.top < limits.ptMinTrackSize.y);
-    it->second.waitingForClosure = undersized || state.filePilotCorrectionBlocked;
+    it->second.waitingForClosure = undersized;
 }
 static bool IsApplicationWindow(HWND hwnd) {
     if (!hwnd || !IsWindow(hwnd)) return false;
@@ -378,6 +388,7 @@ void Wh_ModBeforeUninit() {
         for (auto& [hwnd, state] : g_windows) {
             // Hidden background windows must not enter the manual-closure wait.
             state.waitingForClosure = IsWindowVisible(hwnd) || IsIconic(hwnd);
+            state.checkQueued = state.waitingForClosure;
             windows.push_back(hwnd);
         }
     }
@@ -389,14 +400,21 @@ void Wh_ModBeforeUninit() {
     }
     for (;;) {
         bool waiting = false;
+        std::vector<HWND> checks;
         {
             std::lock_guard lock(g_windowsMutex);
-            for (const auto& [hwnd, state] : g_windows) {
-                if (state.waitingForClosure) { waiting = true; break; }
+            for (auto& [hwnd, state] : g_windows) {
+                if (!state.waitingForClosure) continue;
+                waiting = true;
+                if (!state.checkQueued) {
+                    state.checkQueued = true;
+                    checks.push_back(hwnd);
+                }
             }
         }
         if (!waiting) break;
-        Sleep(200); // WM_NCDESTROY removes each manually closed window.
+        for (HWND hwnd : checks) PostMessageW(hwnd, g_checkMessage, 0, 0);
+        Sleep(250); // Reassess after manual enlargement; at most one queued check/window.
     }
     windows.clear();
     {
