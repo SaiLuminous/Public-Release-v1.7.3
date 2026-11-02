@@ -37,3 +37,5 @@ Version 1.8.3 judges size using the current visible rectangle; minimized and max
 1.8.5: Consolidates executable-name lookup at initialization, adds a credited visual from the original mod, removes repeated README caveats, wraps text, fixes heading spacing, and documents late attachment. User-facing docs no longer contain test-status notes. Actual unload/runtime validation remains pending; the existing close/popup behavior is unchanged.
 
 1.8.6: Corrects the embedded README closing marker so Windhawk can display Details. No runtime behavior changed.
+
+1.8.7: Removes all automatic closing, popups, minimum-size bookkeeping, retry loops and internal WindhawkUtils protocol access. Requires WS_THICKFRAME and a desktop parent. Uses supported subclass removal and Wh_Log HWND/class/thread diagnostics. Warning documents reported application-dependent crashes with undersized windows. No runtime crash prevention or unload fix is claimed without testing.

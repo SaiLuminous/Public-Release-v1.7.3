@@ -11,7 +11,7 @@ Explorer-only approach to eligible top-level application windows.
 
 [Watch the demonstration on Imgur](https://imgur.com/a/7klvrgt).
 
-**Version:** 1.8.6 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
+**Version:** 1.8.7 · **Author:** [SaiLuminous](https://github.com/SaiLuminous)
 
 ## Installation
 
@@ -19,6 +19,12 @@ Explorer-only approach to eligible top-level application windows.
 2. Copy the complete [mod source](mods/application-windows-no-min-size.wh.cpp).
 3. Select **Create a New Mod** in Windhawk, paste the source, and compile.
 4. Enable the mod and resize a supported window.
+**Before disabling or updating:** save your work and enlarge undersized windows
+to their normal minimum, or close them yourself. Crashes have been reported
+when disabling with undersized windows open; affected applications may crash.
+This is an application-dependent risk, not a guaranteed outcome for every window.
+The mod does not automatically close windows, show close prompts, or wait for
+you to resize them.
 ## Usage
 
 Enable the mod, then resize a supported window normally or with your window
@@ -27,7 +33,8 @@ manager. Disable other minimum-size mods that target the same applications.
 The mod targets all processes by default. Use Windhawk's per-mod advanced
 process inclusion/exclusion controls to restrict it to particular applications.
 Explorer's desktop, taskbar, and helper windows are excluded; only its folder
-window classes are eligible.
+window classes are eligible. Only resizable desktop windows are subclassed;
+fixed-size helpers and message-only windows are excluded.
 
 ## File Pilot support
 
@@ -47,23 +54,6 @@ It does not patch the executable on disk.
 
 Enable the option in the Settings tab. Other mods hooking the same function
 may interfere with it.
-
-## Disabling or updating
-
-The mod restores normal minimum-size handling. It requests a normal close for
-visible, non-minimized, non-maximized windows below their observed minimum.
-Windows with no observed minimum cannot be detected by this check.
-
-If a requested window remains open after three seconds, a popup asks you to
-save your work and close the app. Save prompts and cancellation are respected.
-No process is force-terminated.
-
-Other windows are left open unless callback removal times out. Blocked
-attachment or callback cleanup can also trigger a close request and a popup,
-regardless of window size. The popup explains which step is blocked.
-
-This fallback cannot detect a later wait inside Windhawk's own hook removal.
-Applications may enforce their minimum again on a subsequent resize.
 
 ## Compatibility and limitations
 
