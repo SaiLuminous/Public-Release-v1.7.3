@@ -1,4 +1,4 @@
-Publication notes — v1.8.0
+Publication notes — v1.8.3
 Author: SaiLuminous
 Original mod author: Anixx
 
@@ -15,7 +15,7 @@ Review adjustments:
 
 Also replaced raw hook casts with typed hooks, simplified tracking to a set,
 removed dead fields, and cleaned up documentation and indentation.
-Version remains monotonic at 1.8.0 so existing local installations can update.
+Version remains monotonic at 1.8.1 so existing local installations can update.
 
 Validation:
 - x86 and x86-64 compiler checks: run after changes.
@@ -25,3 +25,15 @@ Validation:
 
 Submit only mods/application-windows-no-min-size.wh.cpp to the official collection.
 Do not describe the earlier runtime hangs as proven fixed before live validation.
+
+1.8.1: Adds timed window-subclass detach attempts, normal close requests on blocked cleanup, and one manual-close prompt per process. No force termination. Uses WindhawkUtils internal removal-message protocol. Runtime validation is pending; later engine hook-removal waits cannot be detected by this fallback.
+
+1.8.3: Restores normal close requests for undersized windows using observed native and File Pilot dimensions. After three seconds, one popup per process requests manual closure. No indefinite size-based polling; cancellation is respected if callbacks detach successfully. Live validation remains pending.
+
+Version 1.8.3 judges size using the current visible rectangle; minimized and maximized windows are excluded from size-based closing. Cleanup-timeout prompts remain possible at any size and now state their exact reason. A close request is not forced termination, and apps can require confirmation or decline it. Runtime validation is pending.
+
+1.8.4: Replaces fixed File Pilot timestamp/image-size/RVA checks with a unique executable .text pattern match. Wildcards cover both object-field offsets and the final IAT displacement. Return address is derived from the match end. Missing/ambiguous patterns fail closed; other releases have not been live-tested.
+
+1.8.5: Consolidates executable-name lookup at initialization, adds a credited visual from the original mod, removes repeated README caveats, wraps text, fixes heading spacing, and documents late attachment. User-facing docs no longer contain test-status notes. Actual unload/runtime validation remains pending; the existing close/popup behavior is unchanged.
+
+1.8.6: Corrects the embedded README closing marker so Windhawk can display Details. No runtime behavior changed.
